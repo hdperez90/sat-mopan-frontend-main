@@ -1,13 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, ReferenceLine
+  AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, ReferenceLine, Legend
 } from 'recharts';
 
 const API = 'https://web-production-81316.up.railway.app';
 
-// Umbrales de DISTANCIA en cm
-// A MENOR distancia = MAYOR peligro
 const DIST_NORMAL     = 300;
 const DIST_PRECAUCION = 200;
 const DIST_ALERTA     = 100;
@@ -43,7 +41,9 @@ function CustomTooltip({ active, payload, label }) {
   return (
     <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, padding: '8px 12px', fontFamily: 'monospace', fontSize: 12 }}>
       <div style={{ color: '#64748b', marginBottom: 4 }}>{label}</div>
-      <div style={{ color: '#60a5fa', fontWeight: 600 }}>{payload[0]?.value?.toFixed(1)} cm</div>
+      {payload.map((p, i) => p.value !== null && (
+        <div key={i} style={{ color: p.color || '#60a5fa', fontWeight: 600 }}>{p.name}: {parseFloat(p.value).toFixed(1)} cm</div>
+      ))}
     </div>
   );
 }
@@ -59,7 +59,7 @@ function KpiCard({ accent, label, value, valueSub, color, sub }) {
   );
 }
 
-// ── Panel ML ──────────────────────────────────────────────────
+// ── Panel ML Random Forest ─────────────────────────────────────
 function PanelML() {
   const [pred, setPred] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -84,7 +84,6 @@ function PanelML() {
       <div style={{ fontSize: 11, color: '#475569', fontFamily: 'monospace' }}>Cargando modelo ML...</div>
     </div>
   );
-
   if (!pred) return null;
 
   const cfg = RIESGO_CFG[pred.riesgo] || RIESGO_CFG['MINIMO'];
@@ -117,9 +116,7 @@ function PanelML() {
           <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 8 }}>Score de riesgo</div>
           <div style={{ fontFamily: 'monospace', fontSize: 52, fontWeight: 700, color: cfg.c, lineHeight: 1 }}>{score}</div>
           <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>/100</div>
-          <div style={{ display: 'inline-block', fontSize: 12, fontWeight: 700, padding: '4px 16px', borderRadius: 6, marginTop: 8, background: cfg.bg, color: cfg.c, letterSpacing: '.05em' }}>
-            {pred.riesgo}
-          </div>
+          <div style={{ display: 'inline-block', fontSize: 12, fontWeight: 700, padding: '4px 16px', borderRadius: 6, marginTop: 8, background: cfg.bg, color: cfg.c, letterSpacing: '.05em' }}>{pred.riesgo}</div>
           <div style={{ marginTop: 12, height: 8, background: '#1e293b', borderRadius: 4, overflow: 'hidden' }}>
             <div style={{ height: '100%', width: score + '%', background: cfg.c, borderRadius: 4, transition: 'width .8s ease' }} />
           </div>
@@ -130,9 +127,7 @@ function PanelML() {
 
         <div style={{ background: '#0f172a', borderRadius: 10, padding: 14, textAlign: 'center' }}>
           <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 8 }}>Tiempo a precaución</div>
-          <div style={{ fontFamily: 'monospace', fontSize: 52, fontWeight: 700, color: etaColor, lineHeight: 1 }}>
-            {eta !== null ? eta : 'N/A'}
-          </div>
+          <div style={{ fontFamily: 'monospace', fontSize: 52, fontWeight: 700, color: etaColor, lineHeight: 1 }}>{eta !== null ? eta : 'N/A'}</div>
           <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>minutos</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 14 }}>
             <div style={{ background: '#1e293b', borderRadius: 6, padding: 8 }}>
@@ -170,18 +165,14 @@ function PanelML() {
 
       {impEntries.length > 0 && (
         <div>
-          <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 10 }}>
-            Importancia de variables — Random Forest
-          </div>
+          <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 10 }}>Importancia de variables — Random Forest</div>
           {impEntries.map(([k, v]) => (
             <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 7 }}>
               <span style={{ fontSize: 11, color: '#94a3b8', width: 120, flexShrink: 0 }}>{IMP_LABELS[k] || k}</span>
               <div style={{ flex: 1, height: 8, background: '#0f172a', borderRadius: 4, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: Math.round((v / maxImp) * 100) + '%', background: '#3b82f6', borderRadius: 4 }} />
               </div>
-              <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#60a5fa', width: 40, textAlign: 'right' }}>
-                {(v * 100).toFixed(2)}%
-              </span>
+              <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#60a5fa', width: 40, textAlign: 'right' }}>{(v * 100).toFixed(2)}%</span>
             </div>
           ))}
         </div>
@@ -190,6 +181,160 @@ function PanelML() {
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#334155', marginTop: 12, borderTop: '1px solid #1e293b', paddingTop: 10 }}>
         <span>{pred.metodo}</span>
         <span>{pred.total_mediciones_db} registros en DB</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Panel Predicción + Proyección ─────────────────────────────
+function PanelPrediccionProyeccion() {
+  const [datos, setDatos] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchDatos = useCallback(async () => {
+    try {
+      const [rHist, rProy, rLSTM] = await Promise.all([
+        fetch(`${API}/historial?limite=20`),
+        fetch(`${API}/proyeccion`),
+        fetch(`${API}/prediccion-lstm`)
+      ]);
+      const hist = (await rHist.json()).reverse().filter(m => m.nivel_cm < 900);
+      const proy = await rProy.json();
+      const lstm = await rLSTM.json();
+      setDatos({ hist, proy, lstm });
+    } catch {}
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchDatos();
+    const t = setInterval(fetchDatos, 30000);
+    return () => clearInterval(t);
+  }, [fetchDatos]);
+
+  if (loading) return (
+    <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 10, padding: 16 }}>
+      <div style={{ fontSize: 11, color: '#475569', fontFamily: 'monospace' }}>Cargando predicción y proyección...</div>
+    </div>
+  );
+  if (!datos || datos.proy.error) return null;
+
+  const { hist, proy, lstm } = datos;
+  const tasa    = proy.tasa_cm_min || 0;
+  const lstmEta = lstm.disponible ? lstm.minutos_a_precaucion : null;
+  const etaColor = lstmEta !== null && lstmEta < 60 ? '#ef4444' : lstmEta !== null && lstmEta < 240 ? '#f59e0b' : '#3b82f6';
+
+  // Construir datos de la gráfica combinada
+  const histPuntos = hist.map((m, i) => {
+    const diffMin = Math.round((new Date(m.timestamp) - new Date(hist[hist.length - 1].timestamp)) / 60000);
+    return { label: diffMin === 0 ? 'ahora' : diffMin + 'm', real: m.nivel_cm, proyeccion: null, lstmPunto: null };
+  });
+
+  const proyPuntos = proy.puntos.slice(1).map(p => ({
+    label: '+' + p.minutos + 'm',
+    real: null,
+    proyeccion: p.distancia_cm,
+    lstmPunto: lstmEta !== null && Math.abs(p.minutos - lstmEta) < 6 ? p.distancia_cm : null
+  }));
+
+  const chartData = [...histPuntos, ...proyPuntos];
+
+  // Interpretación combinada
+  let interp = '';
+  const prec = proy.cruces_umbrales?.precaucion;
+  if (lstmEta !== null && prec) {
+    const diff = Math.abs(lstmEta - prec);
+    interp = `Proyección lineal: precaución en ${prec} min. LSTM (red neuronal): ${lstmEta} min. Diferencia: ${diff} min. ${diff < 30 ? 'Alta concordancia entre modelos.' : 'El LSTM considera factores estacionales adicionales.'}`;
+  } else if (lstmEta !== null) {
+    interp = `LSTM predice precaución en ${lstmEta} min. La proyección lineal no cruza el umbral en 120 min (río ${tasa > 0 ? 'bajando' : 'estable'}).`;
+  } else {
+    interp = `Tasa actual: ${tasa.toFixed(3)} cm/min. ${tasa < 0 ? 'Río subiendo — monitoreo activo.' : 'Río bajando o estable.'}`;
+  }
+
+  return (
+    <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 10, padding: 16 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.07em' }}>
+          Predicción LSTM + Proyección futura
+        </span>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 20, background: '#0f2d1a', color: '#22c55e', border: '1px solid #166534', fontWeight: 500 }}>LSTM activo</span>
+          <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 20, background: '#1e3a5f', color: '#60a5fa', border: '1px solid #1d4ed8', fontWeight: 500 }}>120 min horizonte</span>
+        </div>
+      </div>
+
+      {/* KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 14 }}>
+        <div style={{ background: '#0f172a', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', marginBottom: 6 }}>LSTM — tiempo a precaución</div>
+          <div style={{ fontFamily: 'monospace', fontSize: 32, fontWeight: 700, color: etaColor }}>{lstmEta !== null ? lstmEta : 'N/A'}</div>
+          <div style={{ fontSize: 11, color: '#475569' }}>minutos (red neuronal)</div>
+        </div>
+        <div style={{ background: '#0f172a', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', marginBottom: 6 }}>Proyección — precaución</div>
+          <div style={{ fontFamily: 'monospace', fontSize: 32, fontWeight: 700, color: prec ? '#f59e0b' : '#22c55e' }}>{prec || '>120'}</div>
+          <div style={{ fontSize: 11, color: '#475569' }}>minutos (lineal)</div>
+        </div>
+        <div style={{ background: '#0f172a', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', marginBottom: 6 }}>Tasa de cambio</div>
+          <div style={{ fontFamily: 'monospace', fontSize: 32, fontWeight: 700, color: tasa < -0.5 ? '#ef4444' : tasa > 0.5 ? '#22c55e' : '#94a3b8' }}>
+            {tasa > 0 ? '+' : ''}{tasa.toFixed(2)}
+          </div>
+          <div style={{ fontSize: 11, color: '#475569' }}>cm por minuto</div>
+        </div>
+      </div>
+
+      {/* Leyenda */}
+      <div style={{ display: 'flex', gap: 16, marginBottom: 10, flexWrap: 'wrap' }}>
+        {[
+          { color: '#60a5fa', dash: false, label: 'Historial real' },
+          { color: '#60a5fa', dash: true,  label: 'Proyección lineal' },
+          { color: '#ef4444', dot: true,   label: 'Predicción LSTM' },
+          { color: '#f59e0b', dash: true,  label: 'Precaución 200cm' },
+          { color: '#ef4444', dash: true,  label: 'Alerta 100cm' },
+        ].map(l => (
+          <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#64748b' }}>
+            {l.dot
+              ? <div style={{ width: 10, height: 10, borderRadius: '50%', background: l.color }} />
+              : <div style={{ width: 20, height: 2, background: l.color, borderTop: l.dash ? `2px dashed ${l.color}` : 'none', opacity: l.dash ? 0.8 : 1 }} />
+            }
+            {l.label}
+          </div>
+        ))}
+      </div>
+
+      {/* Gráfica */}
+      <ResponsiveContainer width="100%" height={220}>
+        <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+          <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#475569' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+          <YAxis tick={{ fontSize: 9, fill: '#475569' }} axisLine={false} tickLine={false} tickFormatter={v => v + 'cm'} domain={[0, 350]} width={46} />
+          <Tooltip content={<CustomTooltip />} />
+          <ReferenceLine y={DIST_PRECAUCION} stroke="#f59e0b" strokeDasharray="4 3" strokeOpacity={0.7} />
+          <ReferenceLine y={DIST_ALERTA}     stroke="#ef4444" strokeDasharray="4 3" strokeOpacity={0.7} />
+          <ReferenceLine y={DIST_EMERGENCIA} stroke="#ef4444" strokeDasharray="4 3" strokeOpacity={0.5} />
+          <Line type="monotone" dataKey="real"       name="Historial"   stroke="#60a5fa" strokeWidth={2} dot={false} connectNulls={false} />
+          <Line type="monotone" dataKey="proyeccion" name="Proyección"  stroke="#60a5fa" strokeWidth={2} strokeDasharray="6 4" dot={false} connectNulls={false} />
+          <Line type="monotone" dataKey="lstmPunto"  name="LSTM"        stroke="#ef4444" strokeWidth={0} dot={{ r: 8, fill: '#ef4444', strokeWidth: 2, stroke: '#fff' }} connectNulls={false} />
+        </LineChart>
+      </ResponsiveContainer>
+
+      {/* Interpretación */}
+      <div style={{ background: '#0f172a', borderLeft: '3px solid #3b82f6', borderRadius: '0 8px 8px 0', padding: '12px 14px', fontSize: 12, color: '#94a3b8', lineHeight: 1.6, marginTop: 12, marginBottom: 14 }}>
+        {interp}
+      </div>
+
+      {/* Explicación diferencia */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div style={{ background: '#0f172a', borderRadius: 8, padding: 12, borderLeft: '3px solid #3b82f6' }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Proyección (línea punteada)</div>
+          <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.6 }}>Extrapolación matemática lineal. Calcula cómo estará el río si continúa con la tasa de cambio actual.</div>
+        </div>
+        <div style={{ background: '#0f172a', borderRadius: 8, padding: 12, borderLeft: '3px solid #ef4444' }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Predicción LSTM (punto rojo)</div>
+          <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.6 }}>Red neuronal entrenada con datos históricos del río. Considera estacionalidad, lluvias y patrones temporales.</div>
+        </div>
       </div>
     </div>
   );
@@ -234,12 +379,12 @@ function Simulador({ onEnvio }) {
   };
 
   const presets = [
-    { label: 'Normal (280cm)',     v: 280, s: {} },
-    { label: 'Normal bajo (220cm)',v: 220, s: {} },
-    { label: 'Precaución (180cm)', v: 180, s: { borderColor: '#f59e0b', color: '#f59e0b' } },
-    { label: 'Alerta (90cm)',      v: 90,  s: { borderColor: '#f97316', color: '#f97316' } },
-    { label: 'Emergencia (40cm)',  v: 40,  s: { borderColor: '#ef4444', color: '#ef4444' } },
-    { label: 'Error sensor (999)', v: 999, s: { borderColor: '#64748b', color: '#64748b' } },
+    { label: 'Normal (280cm)',      v: 280, s: {} },
+    { label: 'Normal bajo (220cm)', v: 220, s: {} },
+    { label: 'Precaución (180cm)',  v: 180, s: { borderColor: '#f59e0b', color: '#f59e0b' } },
+    { label: 'Alerta (90cm)',       v: 90,  s: { borderColor: '#f97316', color: '#f97316' } },
+    { label: 'Emergencia (40cm)',   v: 40,  s: { borderColor: '#ef4444', color: '#ef4444' } },
+    { label: 'Error sensor (999)',  v: 999, s: { borderColor: '#64748b', color: '#64748b' } },
   ];
 
   return (
@@ -253,19 +398,14 @@ function Simulador({ onEnvio }) {
       </div>
 
       <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 10, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 500, marginBottom: 8 }}>
-          Distancia sensor al agua (cm) — menor = mayor peligro
-        </div>
+        <div style={{ fontSize: 10, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 500, marginBottom: 8 }}>Distancia sensor al agua (cm) — menor = mayor peligro</div>
         <input type="range" min={20} max={350} step={1} value={dist} onChange={e => setDist(parseFloat(e.target.value))} style={{ width: '100%', accentColor: '#7c3aed', marginBottom: 6 }} />
         <div style={{ fontFamily: 'monospace', fontSize: 28, fontWeight: 700, color: est.c, textAlign: 'center', margin: '6px 0 4px' }}>{dist} cm</div>
         <div style={{ height: 8, background: '#0f172a', borderRadius: 4, overflow: 'hidden', marginBottom: 4 }}>
           <div style={{ height: '100%', width: pct + '%', background: est.c, borderRadius: 4, transition: 'all .3s' }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#475569' }}>
-          <span>Emergencia &lt;50cm</span>
-          <span>Alerta &lt;100cm</span>
-          <span>Precaución &lt;200cm</span>
-          <span>Normal &gt;200cm</span>
+          <span>Emergencia &lt;50cm</span><span>Alerta &lt;100cm</span><span>Precaución &lt;200cm</span><span>Normal &gt;200cm</span>
         </div>
       </div>
 
@@ -334,7 +474,6 @@ export default function App() {
   const est     = getEstado(distCm);
   const pctBarra = distCm < 900 ? Math.min(100, (distCm / DIST_NORMAL) * 100) : 0;
 
-  // Grafica: distancia al agua — menor es mas peligroso
   const chartData = historial.filter(m => m.nivel_cm < 900).map(m => ({
     hora: new Date(m.timestamp).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' }),
     dist: parseFloat(m.nivel_cm.toFixed(1))
@@ -383,7 +522,7 @@ export default function App() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
               <KpiCard accent="#3b82f6" label="Distancia al agua" value={distCm < 900 ? distCm.toFixed(1) + ' cm' : 'Error'} color={est.c} sub="menor distancia = mayor riesgo" />
               <KpiCard accent="#f59e0b" label="Batería" value={voltaje.toFixed(2)} color="#f59e0b" sub={voltaje >= 12 ? 'carga óptima' : 'carga baja'} />
-              <KpiCard accent="#8b5cf6" label="Última lectura" value={actual ? new Date(actual.timestamp).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' }) : '--:--'} color="#8b5cf6" valueSub sub="actualiza automáticamente" />
+              <KpiCard accent="#8b5cf6" label="Última lectura" value={actual ? new Date(actual.timestamp).toLocaleString('es-GT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '--/--/----'} color="#8b5cf6" valueSub sub="actualiza automáticamente" />
               <KpiCard accent="#22c55e" label="Mediciones" value={historial.length} color="#22c55e" sub="en este historial" />
             </div>
 
@@ -391,9 +530,7 @@ export default function App() {
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 14 }}>
               <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 10, padding: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.07em' }}>
-                    Historial — distancia sensor al agua
-                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.07em' }}>Historial — distancia sensor al agua</span>
                   <div style={{ display: 'flex', gap: 14 }}>
                     {[['#3b82f6','distancia'],['#f59e0b','precaución 200cm'],['#ef4444','alerta 100cm']].map(([c,l]) => (
                       <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#64748b' }}>
@@ -412,7 +549,7 @@ export default function App() {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
                     <XAxis dataKey="hora" tick={{ fontSize: 10, fill: '#475569' }} axisLine={{ stroke: '#1e293b' }} tickLine={false} interval="preserveStartEnd" />
-                    <YAxis tick={{ fontSize: 10, fill: '#475569' }} axisLine={false} tickLine={false} tickFormatter={v => v + 'cm'} domain={[0, 350]} width={50} reversed={false} />
+                    <YAxis tick={{ fontSize: 10, fill: '#475569' }} axisLine={false} tickLine={false} tickFormatter={v => v + 'cm'} domain={[0, 350]} width={50} />
                     <Tooltip content={<CustomTooltip />} />
                     <ReferenceLine y={DIST_PRECAUCION} stroke="#f59e0b" strokeDasharray="4 3" strokeOpacity={0.7} label={{ value: '200cm', fill: '#f59e0b', fontSize: 9 }} />
                     <ReferenceLine y={DIST_ALERTA}     stroke="#ef4444" strokeDasharray="4 3" strokeOpacity={0.7} label={{ value: '100cm', fill: '#ef4444', fontSize: 9 }} />
@@ -423,17 +560,13 @@ export default function App() {
               </div>
 
               <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 10, padding: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 14 }}>
-                  Distancia al agua
-                </div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 14 }}>Distancia al agua</div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-                  <div style={{ fontFamily: 'monospace', fontSize: 32, fontWeight: 700, color: est.c }}>
-                    {distCm < 900 ? distCm.toFixed(1) : '--'} cm
-                  </div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 32, fontWeight: 700, color: est.c }}>{distCm < 900 ? distCm.toFixed(1) : '--'} cm</div>
                   <div style={{ fontSize: 11, color: '#64748b' }}>distancia sensor → agua</div>
                   <div style={{ width: '100%' }}>
                     {[
-                      { label: 'Normal',     color: '#22c55e', val: distCm > DIST_PRECAUCION ? 100 : (distCm/DIST_PRECAUCION)*100, ref: '>200cm' },
+                      { label: 'Normal',     color: '#22c55e', val: distCm > DIST_PRECAUCION ? 100 : 0, ref: '>200cm' },
                       { label: 'Precaución', color: '#f59e0b', val: distCm <= DIST_PRECAUCION && distCm > DIST_ALERTA ? 100 : 0, ref: '<200cm' },
                       { label: 'Alerta',     color: '#f97316', val: distCm <= DIST_ALERTA && distCm > DIST_EMERGENCIA ? 100 : 0, ref: '<100cm' },
                       { label: 'Emergencia', color: '#ef4444', val: distCm <= DIST_EMERGENCIA ? 100 : 0, ref: '<50cm' },
@@ -457,8 +590,11 @@ export default function App() {
               </div>
             </div>
 
-            {/* Panel ML */}
+            {/* Panel ML Random Forest */}
             <PanelML />
+
+            {/* Panel Predicción + Proyección LSTM */}
+            <PanelPrediccionProyeccion />
 
             {/* Simulador */}
             <Simulador onEnvio={fetchData} />
@@ -483,14 +619,10 @@ export default function App() {
                     return (
                       <tr key={m.id}>
                         <td style={{ fontSize: 12, padding: '7px 8px', borderBottom: '1px solid #1e293b', color: '#f1f5f9', fontFamily: 'monospace' }}>
-                          {new Date(m.timestamp).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                          {new Date(m.timestamp).toLocaleString('es-GT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                         </td>
-                        <td style={{ fontSize: 12, padding: '7px 8px', borderBottom: '1px solid #1e293b', color: '#60a5fa', fontWeight: 600, fontFamily: 'monospace' }}>
-                          {m.nivel_cm.toFixed(1)} cm
-                        </td>
-                        <td style={{ fontSize: 12, padding: '7px 8px', borderBottom: '1px solid #1e293b', color: '#f59e0b', fontFamily: 'monospace' }}>
-                          {m.voltaje_bateria.toFixed(2)} V
-                        </td>
+                        <td style={{ fontSize: 12, padding: '7px 8px', borderBottom: '1px solid #1e293b', color: '#60a5fa', fontWeight: 600, fontFamily: 'monospace' }}>{m.nivel_cm.toFixed(1)} cm</td>
+                        <td style={{ fontSize: 12, padding: '7px 8px', borderBottom: '1px solid #1e293b', color: '#f59e0b', fontFamily: 'monospace' }}>{m.voltaje_bateria.toFixed(2)} V</td>
                         <td style={{ fontSize: 12, padding: '7px 8px', borderBottom: '1px solid #1e293b' }}>
                           <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: e.bg, color: e.c, border: `1px solid ${e.bc}` }}>{e.l}</span>
                         </td>
@@ -504,9 +636,7 @@ export default function App() {
             {/* Footer */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderTop: '1px solid #1e293b' }}>
               <span style={{ fontSize: 10, color: '#475569' }}>Universidad Mariano Gálvez · Héctor Daniel Pérez 5190-15-3835 · SAT Río Mopán</span>
-              <button onClick={fetchData} style={{ background: '#1d4ed8', border: 'none', color: '#fff', borderRadius: 6, padding: '6px 14px', fontSize: 11, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
-                Actualizar ↻
-              </button>
+              <button onClick={fetchData} style={{ background: '#1d4ed8', border: 'none', color: '#fff', borderRadius: 6, padding: '6px 14px', fontSize: 11, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>Actualizar ↻</button>
             </div>
           </>
         )}
