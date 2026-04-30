@@ -340,6 +340,108 @@ function PanelPrediccionProyeccion() {
   );
 }
 
+// ── Panel Comparación Histórica ───────────────────────────────
+function PanelHistorico() {
+  const [datos, setDatos] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchDatos = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/comparacion-historica`);
+      const data = await res.json();
+      if (data.disponible) setDatos(data);
+    } catch {}
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchDatos();
+    const t = setInterval(fetchDatos, 60000);
+    return () => clearInterval(t);
+  }, [fetchDatos]);
+
+  if (loading) return (
+    <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 10, padding: 16 }}>
+      <div style={{ fontSize: 11, color: '#475569', fontFamily: 'monospace' }}>Consultando datos históricos...</div>
+    </div>
+  );
+  if (!datos) return null;
+
+  const pct_peor   = Math.min(100, (datos.peor_caso_min / datos.mejor_caso_min) * 100);
+  const pct_prom   = Math.min(100, (datos.min_promedio / datos.mejor_caso_min) * 100);
+
+  return (
+    <div style={{ background: '#1e293b', border: '1px solid #334155', borderTop: '3px solid #8b5cf6', borderRadius: 10, padding: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.07em' }}>
+          Comparación histórica — Dataset Río Mopán 2022-2024
+        </span>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 20, background: '#2d1f4e', color: '#a78bfa', border: '1px solid #7c3aed', fontWeight: 500 }}>
+            {datos.n_episodios} episodios
+          </span>
+          <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 20, background: '#1e293b', color: '#64748b', border: '1px solid #334155', fontWeight: 500 }}>
+            Ref: {datos.dist_referencia_cm} cm
+          </span>
+        </div>
+      </div>
+
+      {/* Métricas */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 14 }}>
+        {[
+          { label: 'Promedio histórico', val: datos.min_promedio, sub: 'minutos', color: '#8b5cf6' },
+          { label: 'Mediana', val: datos.min_mediana, sub: 'minutos', color: '#60a5fa' },
+          { label: 'Caso más rápido', val: datos.peor_caso_min, sub: 'minutos ⚠️', color: '#ef4444' },
+          { label: 'Caso más lento', val: datos.mejor_caso_min, sub: 'minutos ✓', color: '#22c55e' },
+        ].map(m => (
+          <div key={m.label} style={{ background: '#0f172a', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+            <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>{m.label}</div>
+            <div style={{ fontFamily: 'monospace', fontSize: 28, fontWeight: 700, color: m.color, lineHeight: 1 }}>{m.val}</div>
+            <div style={{ fontSize: 11, color: '#475569', marginTop: 3 }}>{m.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Barra visual de rango */}
+      <div style={{ background: '#0f172a', borderRadius: 8, padding: 14, marginBottom: 14 }}>
+        <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 10 }}>
+          Rango histórico de tiempo a precaución
+        </div>
+        <div style={{ position: 'relative', height: 8, background: '#1e293b', borderRadius: 4, marginBottom: 8 }}>
+          {/* Rango completo */}
+          <div style={{ position: 'absolute', left: '0%', width: '100%', height: '100%', background: 'rgba(139,92,246,0.2)', borderRadius: 4 }} />
+          {/* Promedio */}
+          <div style={{
+            position: 'absolute',
+            left: `${Math.min(95, (datos.min_promedio / datos.mejor_caso_min) * 100)}%`,
+            top: -4, width: 2, height: 16, background: '#8b5cf6', borderRadius: 1
+          }} />
+          {/* Peor caso */}
+          <div style={{
+            position: 'absolute',
+            left: `${Math.min(95, (datos.peor_caso_min / datos.mejor_caso_min) * 100)}%`,
+            top: -4, width: 2, height: 16, background: '#ef4444', borderRadius: 1
+          }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#475569' }}>
+          <span style={{ color: '#ef4444' }}>Mín: {datos.peor_caso_min} min</span>
+          <span style={{ color: '#8b5cf6' }}>Promedio: {datos.min_promedio} min</span>
+          <span style={{ color: '#22c55e' }}>Máx: {datos.mejor_caso_min} min</span>
+        </div>
+      </div>
+
+      {/* Interpretación */}
+      <div style={{ background: '#0f172a', borderLeft: '3px solid #8b5cf6', borderRadius: '0 8px 8px 0', padding: '12px 14px', fontSize: 12, color: '#94a3b8', lineHeight: 1.6, marginBottom: 10 }}>
+        {datos.interpretacion}
+      </div>
+
+      <div style={{ fontSize: 10, color: '#334155', textAlign: 'right' }}>
+        Mes más frecuente en episodios similares: {datos.mes_mas_comun}
+      </div>
+    </div>
+  );
+}
+
 // ── Simulador ─────────────────────────────────────────────────
 function Simulador({ onEnvio }) {
   const [dist, setDist] = useState(250);
@@ -595,6 +697,9 @@ export default function App() {
 
             {/* Panel Predicción + Proyección LSTM */}
             <PanelPrediccionProyeccion />
+
+            {/* Panel Comparación Histórica */}
+            <PanelHistorico />
 
             {/* Simulador */}
             <Simulador onEnvio={fetchData} />
