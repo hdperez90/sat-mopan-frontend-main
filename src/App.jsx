@@ -391,8 +391,8 @@ function PanelHistorico() {
         {[
           { label: 'Promedio histórico', val: datos.min_promedio, sub: 'minutos', color: '#8b5cf6' },
           { label: 'Mediana', val: datos.min_mediana, sub: 'minutos', color: '#60a5fa' },
-          { label: 'Caso más rápido', val: datos.peor_caso_min, sub: 'minutos ⚠️', color: '#ef4444' },
-          { label: 'Caso más lento', val: datos.mejor_caso_min, sub: 'minutos ✓', color: '#22c55e' },
+          { label: 'Caso más rápido ⚠️', val: datos.mejor_caso_min, sub: 'minutos — más peligroso', color: '#ef4444' },
+          { label: 'Caso más lento ✓', val: datos.peor_caso_min, sub: 'minutos — más seguro', color: '#22c55e' },
         ].map(m => (
           <div key={m.label} style={{ background: '#0f172a', borderRadius: 8, padding: 12, textAlign: 'center' }}>
             <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>{m.label}</div>
@@ -424,9 +424,9 @@ function PanelHistorico() {
           }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#475569' }}>
-          <span style={{ color: '#ef4444' }}>Mín: {datos.peor_caso_min} min</span>
+          <span style={{ color: '#ef4444' }}>Mín: {datos.mejor_caso_min} min</span>
           <span style={{ color: '#8b5cf6' }}>Promedio: {datos.min_promedio} min</span>
-          <span style={{ color: '#22c55e' }}>Máx: {datos.mejor_caso_min} min</span>
+          <span style={{ color: '#22c55e' }}>Máx: {datos.peor_caso_min} min</span>
         </div>
       </div>
 
